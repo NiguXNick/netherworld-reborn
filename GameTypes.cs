@@ -276,6 +276,9 @@ public sealed class GameTypes
         L("player/clear_stages", "ClearStageData");
         L("player/stage_missions", "PlayerStageMissionData");
         L("player/innocents", "UserInnocentData");
+        // Declared as ResponseData<List<T>> at the call site (generic T unresolved from the DLL), so
+        // map it explicitly; otherwise the response is nil and the potential sync sees a null list.
+        L("potential/conditions", "PlayerCharacterPotentialConditionData");
 
         // TrophyEngine reads these with GetData<PlayerTrophyResponseData<T>>.
         void Trophy(string method, string row) =>

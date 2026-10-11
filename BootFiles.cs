@@ -44,6 +44,12 @@ public static class BootFiles
             $"url_file={b}/file",
             $"url_zip={b}/zip",
             $"config_sdk={b}/sdk/config_sdk.json",
+            // The hotfix web-event hook (CheckWebMessage) builds a WWWForm with Settings.Get("web_appid"):
+            // a null value throws ArgumentNullException in WWWForm.AddField and breaks the home web hook.
+            // Give it non-empty values; the request itself just 404s here and the coroutine bails cleanly.
+            "web_appid=disgaea",
+            "web_lang=en",
+            $"url_webevent_api={b}/webevent",
             cfg.ClientLogAll ? "log=Log:ALL" : "log=Log:default,ErrorCheck,LogError",
             "AutoSignin=false",
         })) + "\n"));

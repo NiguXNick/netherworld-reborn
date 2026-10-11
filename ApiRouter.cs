@@ -101,14 +101,21 @@ public sealed class ApiRouter
         var prms = string.IsNullOrEmpty(prmsJson) ? new JsonObject() : JsonNode.Parse(prmsJson) as JsonObject ?? new JsonObject();
         var player = _players.BySession(session);
 
+        _types.ResultTypes.TryGetValue(method, out var resultType);
+
         object? result;
         var known = _handlers.TryHandle(method, player, prms, out result);
         if (!known)
+        {
             Log.Warn($"RPC not implemented (default response): {method} {prmsJson}");
+            // A default (empty) response whose type carries after_t_status would send it as null;
+            // the client replaces its whole status from that field and UpdateAllStatus(null) throws,
+            // hanging the screen on an endless loading spinner (e.g. the Dark Assembly's agenda/index).
+            result ??= _handlers.DefaultStatusResponse(player, resultType);
+        }
         else
             Log.Info($"RPC {method} {prmsJson}");
 
-        _types.ResultTypes.TryGetValue(method, out var resultType);
         if (resultType == null)
             Log.Error($"Unknown response type for {method}; sending result=nil.");
 

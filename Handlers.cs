@@ -159,6 +159,28 @@ public sealed class Handlers
         _map["raid/current"] = (p, q) => Obj(("current_t_raid_status", Nil));
         // RegularDataManager.UpdateAgendaBadge dereferences new_agenda without a null check.
         _map["player/badges"] = (p, q) => Obj(("new_agenda", Obj()));
+
+        // Character Potential screen: CharaPotentialTopPlate.Setup iterates every MasterPotentialClass
+        // row and looks the player's entry up by m_potential_class_id; a missing one is passed to
+        // CharaPotentialListNode.Setup as null and dereferenced (NRE -> endless loading). So return one
+        // entry per master class, at that class's lowest master rank (ListNode then resolves the matching
+        // MasterPotentialClassRank). Kinds can stay empty for a character with no potential progress.
+        _map["potential/current"] = PotentialCurrent;
+    }
+
+    private object? PotentialCurrent(Player? p, JsonObject q)
+    {
+        var ranks = _master.All("MPotentialClassRank");
+        var classes = _master.All("MPotentialClass").Select(c =>
+        {
+            var classId = MasterData.F<ulong>(c, "id");
+            var minRank = ranks.Where(r => MasterData.F<ulong>(r, "m_potential_class_id") == classId)
+                .Select(r => MasterData.F<int>(r, "rank")).DefaultIfEmpty(1).Min();
+            return (object?)Obj(
+                ("id", 0UL), ("t_player_id", p?.Id ?? 0),
+                ("m_potential_class_id", classId), ("rank", minRank));
+        }).ToList();
+        return Obj(("t_potential_classes", classes), ("t_potential_kinds", Array.Empty<object>()));
     }
 
     // InnocentVillageUtility looks the player's kingdom rank up in MKingdomRank and crashes the
@@ -211,6 +233,18 @@ public sealed class Handlers
                 if (c.Commands[i] != 0 && !seen.Add(c.Commands[i])) c.Commands[i] = 0;
             _chars.Learn(c); // saves from before learned skills were tracked
         }
+    }
+
+    // Safety net for still-unimplemented RPCs: if the response type carries an after_t_status field
+    // (the client overwrites its whole status from it), send the real status instead of a null one.
+    // Without this the client's PlayerManager.UpdateAllStatus(null) throws and the loading screen
+    // never clears (confirmed for the Dark Assembly / agenda/index; applies to any such mode).
+    public object? DefaultStatusResponse(Player? p, Type? resultType)
+    {
+        if (p == null || resultType == null) return null;
+        return GameTypes.ObjectFieldNames(resultType).Contains("after_t_status")
+            ? Obj(("after_t_status", Status(p)))
+            : null;
     }
 
     // Default value for an unimplemented method: empty object / empty collection.
